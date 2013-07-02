@@ -1,7 +1,7 @@
 # Face Detection & Recognition on iOS
 This is an example iPhone application that performs face detection and recognition using the excellent [OpenCV framework](http://opencv.org).
 
-First you need to initialise the (ELCImagePickerController)[https://github.com/elc/ELCImagePickerController] submodule:
+First you need to initialise the [ELCImagePickerController](https://github.com/elc/ELCImagePickerController) submodule:
 ```
 $ git submodule update --init --recursive
 ``` 
