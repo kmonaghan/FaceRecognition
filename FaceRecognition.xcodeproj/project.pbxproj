@@ -44,6 +44,7 @@
 		4CBE4D8D1655CAC8004B63D9 /* Default@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CBE4D8C1655CAC8004B63D9 /* Default@2x.png */; };
 		4CBE4D8F1655CAC8004B63D9 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CBE4D8E1655CAC8004B63D9 /* Default-568h@2x.png */; };
 		4CBE4D921655CAC8004B63D9 /* MainStoryboard.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 4CBE4D901655CAC8004B63D9 /* MainStoryboard.storyboard */; };
+		F5DC18911796AC8C00FF4318 /* NativeFaceDetectionViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F5DC18901796AC8C00FF4318 /* NativeFaceDetectionViewController.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -101,6 +102,8 @@
 		4CBE4D8C1655CAC8004B63D9 /* Default@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default@2x.png"; sourceTree = "<group>"; };
 		4CBE4D8E1655CAC8004B63D9 /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		4CBE4D911655CAC8004B63D9 /* en */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = en; path = en.lproj/MainStoryboard.storyboard; sourceTree = "<group>"; };
+		F5DC188F1796AC8C00FF4318 /* NativeFaceDetectionViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeFaceDetectionViewController.h; sourceTree = "<group>"; };
+		F5DC18901796AC8C00FF4318 /* NativeFaceDetectionViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeFaceDetectionViewController.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -177,6 +180,8 @@
 				4C9DEA4F165666E2003DBFB5 /* NewPersonViewController.mm */,
 				4C0B18CB1656766400A95B1E /* CaptureImagesViewController.h */,
 				4C0B18CC1656766400A95B1E /* CaptureImagesViewController.mm */,
+				F5DC188F1796AC8C00FF4318 /* NativeFaceDetectionViewController.h */,
+				F5DC18901796AC8C00FF4318 /* NativeFaceDetectionViewController.mm */,
 			);
 			name = "View Controllers";
 			sourceTree = "<group>";
@@ -336,6 +341,7 @@
 				34368068177A418100341668 /* ELCAssetCell.m in Sources */,
 				34368069177A418100341668 /* ELCAssetTablePicker.m in Sources */,
 				3436806A177A418100341668 /* ELCImagePickerController.m in Sources */,
+				F5DC18911796AC8C00FF4318 /* NativeFaceDetectionViewController.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
