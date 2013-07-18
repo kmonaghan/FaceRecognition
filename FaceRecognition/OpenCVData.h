@@ -14,6 +14,7 @@
 + (NSData *)serializeCvMat:(cv::Mat&)cvMat;
 + (cv::Mat)dataToMat:(NSData *)data width:(NSNumber *)width height:(NSNumber *)height;
 + (CGRect)faceToCGRect:(cv::Rect)face;
++ (cv::Rect)CGRectToFace:(CGRect)faceRect;
 + (UIImage *)UIImageFromMat:(cv::Mat)image;
 + (cv::Mat)cvMatFromUIImage:(UIImage *)image;
 + (cv::Mat)cvMatFromUIImage:(UIImage *)image usingColorSpace:(int)outputSpace;

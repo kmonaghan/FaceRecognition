@@ -14,6 +14,8 @@
 
 #import "NativeFaceDetectionViewController.h"
 
+static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
+
 @interface NativeFaceDetectionViewController ()
 {
     IBOutlet UIView *previewView;
@@ -28,7 +30,9 @@
     
     BOOL isUsingFrontFacingCamera;
     
-    NSMutableDictionary *faces;
+    UIImage *square;
+    
+    NSMutableDictionary *recognisedFaces;
     NSMutableDictionary *processing;
     
     CustomFaceRecognizer *faceRecognizer;
@@ -39,6 +43,48 @@
 @end
 
 @implementation NativeFaceDetectionViewController
+// find where the video box is positioned within the preview layer based on the video size and gravity
++ (CGRect)videoPreviewBoxForGravity:(NSString *)gravity frameSize:(CGSize)frameSize apertureSize:(CGSize)apertureSize
+{
+    CGFloat apertureRatio = apertureSize.height / apertureSize.width;
+    CGFloat viewRatio = frameSize.width / frameSize.height;
+    
+    CGSize size = CGSizeZero;
+    if ([gravity isEqualToString:AVLayerVideoGravityResizeAspectFill]) {
+        if (viewRatio > apertureRatio) {
+            size.width = frameSize.width;
+            size.height = apertureSize.width * (frameSize.width / apertureSize.height);
+        } else {
+            size.width = apertureSize.height * (frameSize.height / apertureSize.width);
+            size.height = frameSize.height;
+        }
+    } else if ([gravity isEqualToString:AVLayerVideoGravityResizeAspect]) {
+        if (viewRatio > apertureRatio) {
+            size.width = apertureSize.height * (frameSize.height / apertureSize.width);
+            size.height = frameSize.height;
+        } else {
+            size.width = frameSize.width;
+            size.height = apertureSize.width * (frameSize.width / apertureSize.height);
+        }
+    } else if ([gravity isEqualToString:AVLayerVideoGravityResize]) {
+        size.width = frameSize.width;
+        size.height = frameSize.height;
+    }
+	
+	CGRect videoBox;
+	videoBox.size = size;
+	if (size.width < frameSize.width)
+		videoBox.origin.x = (frameSize.width - size.width) / 2;
+	else
+		videoBox.origin.x = (size.width - frameSize.width) / 2;
+	
+	if ( size.height < frameSize.height )
+		videoBox.origin.y = (frameSize.height - size.height) / 2;
+	else
+		videoBox.origin.y = (size.height - frameSize.height) / 2;
+    
+	return videoBox;
+}
 
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
 {
@@ -46,8 +92,7 @@
     if (self) {
         // Custom initialization
         
-        faces = @[].mutableCopy;
-        processing = @[].mutableCopy;
+
     }
     return self;
 }
@@ -68,6 +113,13 @@
 	faceDetector = [CIDetector detectorOfType:CIDetectorTypeFace context:nil options:detectorOptions];
     
     faceRecognizer = [[CustomFaceRecognizer alloc] initWithEigenFaceRecognizer];
+    
+    [faceRecognizer trainModel];
+    
+    recognisedFaces = @{}.mutableCopy;
+    processing = @{}.mutableCopy;
+    
+    square = [UIImage imageNamed:@"squarePNG"];
 }
 
 - (void)didReceiveMemoryWarning
@@ -171,7 +223,7 @@ bail:
 - (void)teardownAVCapture
 {
 	[stillImageOutput removeObserver:self forKeyPath:@"isCapturingStillImage"];
-
+    
 	[previewLayer removeFromSuperlayer];
 }
 
@@ -231,14 +283,6 @@ bail:
     
 	imageOptions = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:exifOrientation] forKey:CIDetectorImageOrientation];
 	NSArray *features = [faceDetector featuresInImage:ciImage options:imageOptions];
-
-    if ([features count]) {
-        NSLog(@"feature tracking id: %d", ((CIFaceFeature *)features[0]).trackingID);
-        
-        if (((CIFaceFeature *)features[0]).trackingID > 0) {
-            [self identifyFace:features[0] inImage:ciImage];
-        }
-	}
     
     // get the clean aperture
     // the clean aperture is a rectangle that defines the portion of the encoded pixel dimensions
@@ -247,30 +291,190 @@ bail:
 	CGRect clap = CMVideoFormatDescriptionGetCleanAperture(fdesc, false /*originIsTopLeft == false*/);
 	
 	dispatch_async(dispatch_get_main_queue(), ^(void) {
-		//[self drawFaceBoxesForFeatures:features forVideoBox:clap orientation:curDeviceOrientation];
+		[self drawFaceBoxesForFeatures:features forVideoBox:clap orientation:curDeviceOrientation];
 	});
+    
+    if ([features count]) {
+        NSLog(@"feature tracking id: %d", ((CIFaceFeature *)features[0]).trackingID);
+        
+        for (CIFaceFeature *feature in features) {
+            [self identifyFace:feature inImage:[self imageFromSampleBuffer:sampleBuffer]];
+        }
+	}
+}
+
+// called asynchronously as the capture output is capturing sample buffers, this method asks the face detector (if on)
+// to detect features and for each draw the red square in a layer and set appropriate orientation
+- (void)drawFaceBoxesForFeatures:(NSArray *)features forVideoBox:(CGRect)clap orientation:(UIDeviceOrientation)orientation
+{
+	NSArray *sublayers = [NSArray arrayWithArray:[previewLayer sublayers]];
+	NSInteger sublayersCount = [sublayers count], currentSublayer = 0;
+	NSInteger featuresCount = [features count], currentFeature = 0;
+	
+	[CATransaction begin];
+	[CATransaction setValue:(id)kCFBooleanTrue forKey:kCATransactionDisableActions];
+	
+	// hide all the face layers
+	for ( CALayer *layer in sublayers ) {
+		if ( [[layer name] isEqualToString:@"FaceLayer"] )
+			[layer setHidden:YES];
+	}
+	
+	if ( featuresCount == 0 ) {
+		[CATransaction commit];
+		return; // early bail.
+	}
+    
+	CGSize parentFrameSize = [previewView frame].size;
+	NSString *gravity = [previewLayer videoGravity];
+	BOOL isMirrored = [previewLayer isMirrored];
+	CGRect previewBox = [NativeFaceDetectionViewController videoPreviewBoxForGravity:gravity
+                                                                           frameSize:parentFrameSize
+                                                                        apertureSize:clap.size];
+	
+	for ( CIFaceFeature *ff in features ) {
+		// find the correct position for the square layer within the previewLayer
+		// the feature box originates in the bottom left of the video frame.
+		// (Bottom right if mirroring is turned on)
+		CGRect faceRect = [ff bounds];
+        
+		// flip preview width and height
+		CGFloat temp = faceRect.size.width;
+		faceRect.size.width = faceRect.size.height;
+		faceRect.size.height = temp;
+		temp = faceRect.origin.x;
+		faceRect.origin.x = faceRect.origin.y;
+		faceRect.origin.y = temp;
+		// scale coordinates so they fit in the preview box, which may be scaled
+		CGFloat widthScaleBy = previewBox.size.width / clap.size.height;
+		CGFloat heightScaleBy = previewBox.size.height / clap.size.width;
+		faceRect.size.width *= widthScaleBy;
+		faceRect.size.height *= heightScaleBy;
+		faceRect.origin.x *= widthScaleBy;
+		faceRect.origin.y *= heightScaleBy;
+        
+		if ( isMirrored )
+			faceRect = CGRectOffset(faceRect, previewBox.origin.x + previewBox.size.width - faceRect.size.width - (faceRect.origin.x * 2), previewBox.origin.y);
+		else
+			faceRect = CGRectOffset(faceRect, previewBox.origin.x, previewBox.origin.y);
+		
+		CALayer *featureLayer = nil;
+		
+		// re-use an existing layer if possible
+		while ( !featureLayer && (currentSublayer < sublayersCount) ) {
+			CALayer *currentLayer = [sublayers objectAtIndex:currentSublayer++];
+			if ( [[currentLayer name] isEqualToString:@"FaceLayer"] ) {
+				featureLayer = currentLayer;
+				[currentLayer setHidden:NO];
+			}
+		}
+		
+		// create a new one if necessary
+		if ( !featureLayer ) {
+			featureLayer = [CALayer new];
+			[featureLayer setContents:(id)[square CGImage]];
+			[featureLayer setName:@"FaceLayer"];
+			[previewLayer addSublayer:featureLayer];
+		}
+		[featureLayer setFrame:faceRect];
+		
+		switch (orientation) {
+			case UIDeviceOrientationPortrait:
+				[featureLayer setAffineTransform:CGAffineTransformMakeRotation(DegreesToRadians(0.))];
+				break;
+			case UIDeviceOrientationPortraitUpsideDown:
+				[featureLayer setAffineTransform:CGAffineTransformMakeRotation(DegreesToRadians(180.))];
+				break;
+			case UIDeviceOrientationLandscapeLeft:
+				[featureLayer setAffineTransform:CGAffineTransformMakeRotation(DegreesToRadians(90.))];
+				break;
+			case UIDeviceOrientationLandscapeRight:
+				[featureLayer setAffineTransform:CGAffineTransformMakeRotation(DegreesToRadians(-90.))];
+				break;
+			case UIDeviceOrientationFaceUp:
+			case UIDeviceOrientationFaceDown:
+			default:
+				break; // leave the layer in its last known orientation
+		}
+		currentFeature++;
+	}
+	
+	[CATransaction commit];
 }
 
 #pragma mark -
-- (void)identifyFace:(CIFaceFeature *)feature inImage:(CIImage *)image
+- (void)identifyFace:(CIFaceFeature *)feature inImage:(UIImage *)image
 {
-    if (!faces[[NSNumber numberWithInt:feature.trackingID]]) {
+    if (!recognisedFaces[[NSNumber numberWithInt:feature.trackingID]]) {
         if (!processing[[NSNumber numberWithInt:feature.trackingID]]) {
             processing[[NSNumber numberWithInt:feature.trackingID]] = @"1";
+            
+            cv::Mat cvImage = [OpenCVData cvMatFromUIImage:image usingColorSpace:CV_RGBA2BGRA];
+            
+            [self parseFace:[OpenCVData CGRectToFace:feature.bounds]
+                   forImage:cvImage
+                      forId:feature.trackingID];
         }
     } else {
-        NSLog(@"%d is %@", feature.trackingID, faces[[NSNumber numberWithInt:feature.trackingID]]);
+        NSLog(@"%d is %@", feature.trackingID, recognisedFaces[[NSNumber numberWithInt:feature.trackingID]]);
     }
 }
 
-- (void)parseFaces:(const cv::Rect &)face forImage:(cv::Mat&)image forId:(int)trackingID
+- (void)parseFace:(const cv::Rect &)face forImage:(cv::Mat &)image forId:(int)trackingID
 {
-        NSDictionary *match = [faceRecognizer recognizeFace:face inImage:image];
+    NSDictionary *match = [faceRecognizer recognizeFace:face inImage:image];
+    
+    NSLog(@"match: %@", match);
+    
+    // Match found
+    if ([match objectForKey:@"personID"] != [NSNumber numberWithInt:-1])
+    {
+        recognisedFaces[[NSNumber numberWithInt:trackingID]] = [match objectForKey:@"personName"];
         
-        // Match found
-        if ([match objectForKey:@"personID"] != [NSNumber numberWithInt:-1]) {
-            faces[[NSNumber numberWithInt:trackingID]] = [match objectForKey:@"personName"];
-            [processing removeObjectForKey:[NSNumber numberWithInt:trackingID]];
-        }
+    }
+    
+    [processing removeObjectForKey:[NSNumber numberWithInt:trackingID]];
+}
+
+//this comes from http://code.opencv.org/svn/gsoc2012/ios/trunk/HelloWorld_iOS/HelloWorld_iOS/VideoCameraController.m
+- (UIImage *)imageFromSampleBuffer:(CMSampleBufferRef) sampleBuffer
+{
+    // Get a CMSampleBuffer's Core Video image buffer for the media data
+    CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+    // Lock the base address of the pixel buffer
+    CVPixelBufferLockBaseAddress(imageBuffer, 0);
+	
+    // Get the number of bytes per row for the pixel buffer
+    void *baseAddress = CVPixelBufferGetBaseAddress(imageBuffer);
+	
+    // Get the number of bytes per row for the pixel buffer
+    size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
+    // Get the pixel buffer width and height
+    size_t width = CVPixelBufferGetWidth(imageBuffer);
+    size_t height = CVPixelBufferGetHeight(imageBuffer);
+	
+    // Create a device-dependent RGB color space
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+	
+    // Create a bitmap graphics context with the sample buffer data
+    CGContextRef context = CGBitmapContextCreate(baseAddress, width, height, 8,
+												 bytesPerRow, colorSpace, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+	
+    // Create a Quartz image from the pixel data in the bitmap graphics context
+    CGImageRef quartzImage = CGBitmapContextCreateImage(context);
+    // Unlock the pixel buffer
+    CVPixelBufferUnlockBaseAddress(imageBuffer,0);
+	
+    // Free up the context and color space
+    CGContextRelease(context);
+    CGColorSpaceRelease(colorSpace);
+	
+    // Create an image object from the Quartz image
+    UIImage *image = [UIImage imageWithCGImage:quartzImage];
+	
+    // Release the Quartz image
+    CGImageRelease(quartzImage);
+	
+    return (image);
 }
 @end

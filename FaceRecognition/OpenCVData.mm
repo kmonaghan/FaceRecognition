@@ -34,6 +34,17 @@
     return faceRect;
 }
 
++ (cv::Rect)CGRectToFace:(CGRect)faceRect
+{
+    cv::Rect face;
+    face.x = faceRect.origin.x;
+    face.y = faceRect.origin.y;
+    face.width = faceRect.size.width;
+    face.height = faceRect.size.height;
+    
+    return face;
+}
+
 + (UIImage *)UIImageFromMat:(cv::Mat)image
 {
     NSData *data = [NSData dataWithBytes:image.data length:image.elemSize()*image.total()];
