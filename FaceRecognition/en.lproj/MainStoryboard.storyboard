@@ -255,6 +255,11 @@
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                 <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="calibratedWhite"/>
                             </view>
+                            <view contentMode="scaleToFill" id="ge0-hm-1gU">
+                                <rect key="frame" x="0.0" y="0.0" width="320" height="499"/>
+                                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="calibratedWhite"/>
+                            </view>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" id="feB-vk-8w8">
                                 <rect key="frame" x="227" y="20" width="73" height="44"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
@@ -277,6 +282,7 @@
                     <navigationItem key="navigationItem" id="oJ8-zp-oEb"/>
                     <simulatedTabBarMetrics key="simulatedBottomBarMetrics"/>
                     <connections>
+                        <outlet property="faceView" destination="ge0-hm-1gU" id="hGV-6C-3mO"/>
                         <outlet property="previewView" destination="7pk-Dt-FRS" id="R8s-hJ-PD3"/>
                     </connections>
                 </viewController>
@@ -324,6 +330,7 @@
             <source key="sourceIdentifier" type="project" relativePath="./Classes/NativeFaceDetectionViewController.h"/>
             <relationships>
                 <relationship kind="action" name="switchCameras:"/>
+                <relationship kind="outlet" name="faceView" candidateClass="UIView"/>
                 <relationship kind="outlet" name="previewView" candidateClass="UIView"/>
             </relationships>
         </class>

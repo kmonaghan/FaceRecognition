@@ -14,11 +14,14 @@
 
 #import "NativeFaceDetectionViewController.h"
 
+#define CAPTURE_FPS 30
+
 static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
 
 @interface NativeFaceDetectionViewController ()
 {
     IBOutlet UIView *previewView;
+    IBOutlet UIView *faceView;
     
     AVCaptureVideoPreviewLayer *previewLayer;
     AVCaptureStillImageOutput *stillImageOutput;
@@ -29,13 +32,14 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
     CIDetector *faceDetector;
     
     BOOL isUsingFrontFacingCamera;
-    
-    UIImage *square;
+    BOOL isMirrored;
     
     NSMutableDictionary *recognisedFaces;
     NSMutableDictionary *processing;
     
     CustomFaceRecognizer *faceRecognizer;
+    
+    int frameNum;
 }
 
 - (IBAction)switchCameras:(id)sender;
@@ -109,7 +113,7 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
     
     [self setupAVCapture];
     
-    NSDictionary *detectorOptions = [[NSDictionary alloc] initWithObjectsAndKeys:CIDetectorAccuracyLow, CIDetectorAccuracy, nil];
+    NSDictionary *detectorOptions = [[NSDictionary alloc] initWithObjectsAndKeys:CIDetectorAccuracyHigh, CIDetectorAccuracy, nil];
 	faceDetector = [CIDetector detectorOfType:CIDetectorTypeFace context:nil options:detectorOptions];
     
     faceRecognizer = [[CustomFaceRecognizer alloc] initWithEigenFaceRecognizer];
@@ -118,8 +122,6 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
     
     recognisedFaces = @{}.mutableCopy;
     processing = @{}.mutableCopy;
-    
-    square = [UIImage imageNamed:@"squarePNG"];
 }
 
 - (void)didReceiveMemoryWarning
@@ -163,10 +165,17 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
 	
     // Select a video device, make an input
 	AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    for (AVCaptureDevice *d in [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo]) {
+		if ([d position] == AVCaptureDevicePositionFront) {
+			device = d;
+			break;
+		}
+	}
+    
 	AVCaptureDeviceInput *deviceInput = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
 	require( error == nil, bail );
 	{
-        isUsingFrontFacingCamera = NO;
+        isUsingFrontFacingCamera = YES;
         if ( [session canAddInput:deviceInput] )
             [session addInput:deviceInput];
         
@@ -204,6 +213,8 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
         [previewLayer setFrame:[rootLayer bounds]];
         [rootLayer addSublayer:previewLayer];
         [session startRunning];
+        
+        frameNum = 0;
     }
 bail:
     {
@@ -217,6 +228,8 @@ bail:
             [self teardownAVCapture];
         }
     }
+    
+       
 }
 
 // clean up capture setup
@@ -230,6 +243,17 @@ bail:
 #pragma mark -
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection
 {
+    // Only process every CAPTURE_FPS'th frame (every 1s)
+    if (frameNum != CAPTURE_FPS) {
+        frameNum++;
+        
+        return;
+    }
+    
+    frameNum = 0;
+    
+    isMirrored = [connection isVideoMirrored];
+    
 	// got an image
 	CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
 	CFDictionaryRef attachments = CMCopyDictionaryOfAttachments(kCFAllocatorDefault, sampleBuffer, kCMAttachmentMode_ShouldPropagate);
@@ -289,7 +313,7 @@ bail:
     // that represents image data valid for display.
 	CMFormatDescriptionRef fdesc = CMSampleBufferGetFormatDescription(sampleBuffer);
 	CGRect clap = CMVideoFormatDescriptionGetCleanAperture(fdesc, false /*originIsTopLeft == false*/);
-	
+    
 	dispatch_async(dispatch_get_main_queue(), ^(void) {
 		[self drawFaceBoxesForFeatures:features forVideoBox:clap orientation:curDeviceOrientation];
 	});
@@ -307,6 +331,10 @@ bail:
 // to detect features and for each draw the red square in a layer and set appropriate orientation
 - (void)drawFaceBoxesForFeatures:(NSArray *)features forVideoBox:(CGRect)clap orientation:(UIDeviceOrientation)orientation
 {
+    for (UIView *view in [faceView subviews]) {
+        [view removeFromSuperview];
+    }
+    
 	NSArray *sublayers = [NSArray arrayWithArray:[previewLayer sublayers]];
 	NSInteger sublayersCount = [sublayers count], currentSublayer = 0;
 	NSInteger featuresCount = [features count], currentFeature = 0;
@@ -327,7 +355,7 @@ bail:
     
 	CGSize parentFrameSize = [previewView frame].size;
 	NSString *gravity = [previewLayer videoGravity];
-	BOOL isMirrored = [previewLayer isMirrored];
+	
 	CGRect previewBox = [NativeFaceDetectionViewController videoPreviewBoxForGravity:gravity
                                                                            frameSize:parentFrameSize
                                                                         apertureSize:clap.size];
@@ -336,6 +364,7 @@ bail:
 		// find the correct position for the square layer within the previewLayer
 		// the feature box originates in the bottom left of the video frame.
 		// (Bottom right if mirroring is turned on)
+        
 		CGRect faceRect = [ff bounds];
         
 		// flip preview width and height
@@ -357,7 +386,7 @@ bail:
 			faceRect = CGRectOffset(faceRect, previewBox.origin.x + previewBox.size.width - faceRect.size.width - (faceRect.origin.x * 2), previewBox.origin.y);
 		else
 			faceRect = CGRectOffset(faceRect, previewBox.origin.x, previewBox.origin.y);
-		
+		/*
 		CALayer *featureLayer = nil;
 		
 		// re-use an existing layer if possible
@@ -396,6 +425,19 @@ bail:
 			default:
 				break; // leave the layer in its last known orientation
 		}
+         */
+        
+        NSString *name = recognisedFaces[[NSNumber numberWithInt:ff.trackingID]];
+        
+        if (([features count] > 1) && (ff.trackingID == 0)) {
+            name = nil;
+        }
+        
+        if (name) {
+            NSLog(@"%@ is %d", name, ff.trackingID);
+        }
+        [self showFaceRect:faceRect withName:name];
+        
 		currentFeature++;
 	}
 	
@@ -476,5 +518,26 @@ bail:
     CGImageRelease(quartzImage);
 	
     return (image);
+}
+
+- (void)showFaceRect:(CGRect)rect withName:(NSString *)name 
+{
+    UIView *view = [[UIView alloc] initWithFrame:rect];
+    
+    view.layer.borderWidth = 4.0f;
+    
+    view.layer.borderColor = (name) ? [UIColor greenColor].CGColor : [UIColor redColor].CGColor;
+    
+    if (name) {
+        UILabel *nameLabel = [UILabel new];
+        nameLabel.text = name;
+        [nameLabel sizeToFit];
+        nameLabel.textColor = [UIColor greenColor];
+        nameLabel.backgroundColor = [UIColor clearColor];
+        nameLabel.center = CGPointMake(view.frame.size.width / 2, view.frame.size.height / 2);
+        
+        [view addSubview:nameLabel];
+    }
+    [faceView addSubview:view];
 }
 @end
