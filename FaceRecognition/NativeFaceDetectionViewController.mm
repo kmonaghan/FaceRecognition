@@ -113,7 +113,8 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
     
     [self setupAVCapture];
     
-    NSDictionary *detectorOptions = [[NSDictionary alloc] initWithObjectsAndKeys:CIDetectorAccuracyHigh, CIDetectorAccuracy, nil];
+    NSDictionary *detectorOptions = @{ CIDetectorAccuracy : CIDetectorAccuracyHigh, CIDetectorTracking : @(YES) };
+    
 	faceDetector = [CIDetector detectorOfType:CIDetectorTypeFace context:nil options:detectorOptions];
     
     faceRecognizer = [[CustomFaceRecognizer alloc] initWithEigenFaceRecognizer];
@@ -193,7 +194,6 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
                                            [NSNumber numberWithInt:kCMPixelFormat_32BGRA] forKey:(id)kCVPixelBufferPixelFormatTypeKey];
         [videoDataOutput setVideoSettings:rgbOutputSettings];
         [videoDataOutput setAlwaysDiscardsLateVideoFrames:YES]; // discard if the data output queue is blocked (as we process the still image)
-        [[videoDataOutput connectionWithMediaType:AVMediaTypeVideo] setEnabled:YES];
         
         // create a serial dispatch queue used for the sample buffer delegate as well as when a still image is captured
         // a serial dispatch queue must be used to guarantee that video frames will be delivered in order
@@ -203,7 +203,7 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
         
         if ( [session canAddOutput:videoDataOutput] )
             [session addOutput:videoDataOutput];
-        [[videoDataOutput connectionWithMediaType:AVMediaTypeVideo] setEnabled:NO];
+        [[videoDataOutput connectionWithMediaType:AVMediaTypeVideo] setEnabled:YES];
         
         previewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:session];
         [previewLayer setBackgroundColor:[[UIColor blackColor] CGColor]];
@@ -243,14 +243,7 @@ bail:
 #pragma mark -
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection
 {
-    // Only process every CAPTURE_FPS'th frame (every 1s)
-    if (frameNum != CAPTURE_FPS) {
-        frameNum++;
-        
-        return;
-    }
-    
-    frameNum = 0;
+
     
     isMirrored = [connection isVideoMirrored];
     
