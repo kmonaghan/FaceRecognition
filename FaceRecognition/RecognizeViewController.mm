@@ -14,7 +14,10 @@
 
 
 @interface RecognizeViewController ()
-- (IBAction)switchCameraClicked:(id)sender;
+@property (strong, nonatomic) NSString *currentAlgorithm;
+
+- (IBAction)switchCameraAction:(id)sender;
+- (IBAction)changeAlgorithmAction:(id)sender;
 
 @end
 
@@ -26,7 +29,7 @@
 	
     self.faceDetector = [[FaceDetector alloc] init];
     self.faceRecognizer = [[CustomFaceRecognizer alloc] initWithEigenFaceRecognizer];
-    
+    self.currentAlgorithm = @"Current alogrithm: Eigen";
     [self setupCamera];
 }
 
@@ -136,7 +139,7 @@
     self.featureLayer.frame = faceRect;
 }
 
-- (IBAction)switchCameraClicked:(id)sender {
+- (IBAction)switchCameraAction:(id)sender {
     [self.videoCamera stop];
     
     if (self.videoCamera.defaultAVCaptureDevicePosition == AVCaptureDevicePositionFront) {
@@ -146,5 +149,48 @@
     }
     
     [self.videoCamera start];
+}
+
+- (IBAction)changeAlgorithmAction:(id)sender
+{
+    [[[UIActionSheet alloc] initWithTitle:self.currentAlgorithm
+                                 delegate:self
+                        cancelButtonTitle:@"Cancel"
+                   destructiveButtonTitle:nil
+                        otherButtonTitles:@"Eigen", @"Fisher", @"LBP Histogram", nil] showFromTabBar:self.tabBarController.tabBar];
+}
+
+#pragma mark - UIActionSheetDelegate
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+    if (buttonIndex == actionSheet.cancelButtonIndex)
+    {
+        return;
+    }
+    
+    switch (buttonIndex) {
+        case 0:
+        {
+            self.currentAlgorithm = @"Current alogrithm: Eigen";
+            self.faceRecognizer = [[CustomFaceRecognizer alloc] initWithEigenFaceRecognizer];
+        }
+            
+            break;
+        case 1:
+        {
+            self.currentAlgorithm = @"Current alogrithm: Fisher";
+            self.faceRecognizer = [[CustomFaceRecognizer alloc] initWithFisherFaceRecognizer];
+        }
+            break;
+        case 2:
+        {
+            self.currentAlgorithm = @"Current alogrithm: LBH";
+            self.faceRecognizer = [[CustomFaceRecognizer alloc] initWithLBPHFaceRecognizer];
+        }
+            break;
+        default:
+            break;
+    }
+    self.modelAvailable = [self.faceRecognizer trainModel];
 }
 @end

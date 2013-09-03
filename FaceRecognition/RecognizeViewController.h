@@ -11,7 +11,7 @@
 #import "FaceDetector.h"
 #import "CustomFaceRecognizer.h"
 
-@interface RecognizeViewController : UIViewController <CvVideoCameraDelegate>
+@interface RecognizeViewController : UIViewController <CvVideoCameraDelegate, UIActionSheetDelegate>
 
 @property (nonatomic, strong) IBOutlet UIImageView *imageView;
 @property (nonatomic, strong) IBOutlet UILabel *instructionLabel;
