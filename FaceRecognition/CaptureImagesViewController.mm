@@ -30,12 +30,10 @@
     
     [self setupCamera];
     
-    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Instructions"
-                                                    message:@"When the camera starts, move it around to show different angles of your face."
-                                                   delegate:nil
-                                          cancelButtonTitle:@"OK"
-                                          otherButtonTitles:nil];
-    [alert show];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"reset"
+                                                                              style:UIBarButtonItemStyleBordered
+                                                                             target:self
+                                                                             action:@selector(reset)];
 }
 
 - (void)setupCamera
@@ -47,6 +45,11 @@
     self.videoCamera.defaultAVCaptureVideoOrientation = AVCaptureVideoOrientationPortrait;
     self.videoCamera.defaultFPS = 30;
     self.videoCamera.grayscaleMode = NO;
+}
+
+- (void)reset
+{
+    [self.faceRecognizer forgetAllFacesForPersonID:[self.personID integerValue]];
 }
 
 - (void)processImage:(cv::Mat&)image
@@ -140,12 +143,19 @@
         self.instructionsLabel.text = [NSString stringWithFormat:@"Make sure %@ is holding the phone. When you are ready, press start. Or select images from your library.", self.personName];
         
     } else {
+        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Instructions"
+                                                        message:@"When the camera starts, move it around to show different angles of your face."
+                                                       delegate:nil
+                                              cancelButtonTitle:@"OK"
+                                              otherButtonTitles:nil];
+        [alert show];
+        
         self.imageScrollView.hidden = YES;
         self.libraryButton.hidden = YES;
         [self.cameraButton setTitle:@"Stop" forState:UIControlStateNormal];
         self.switchCameraButton.hidden = NO;
         // First, forget all previous pictures of this person
-        [self.faceRecognizer forgetAllFacesForPersonID:[self.personID integerValue]];
+        //[self.faceRecognizer forgetAllFacesForPersonID:[self.personID integerValue]];
     
         // Reset the counter, start taking pictures
         self.numPicsTaken = 0;
@@ -196,13 +206,15 @@
                                  self.numPicsTaken = 0;
                                  
                                  float count = 1.0f;
+                                 int numberOfFaces = 0;
                                  
                                  for(NSDictionary *dict in info) {
                                      UIImage *image = [dict objectForKey:UIImagePickerControllerOriginalImage];
                                      
-                                     UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
-                                     
-                                     imageView.frame = CGRectMake(self.imageScrollView.frame.size.width * (count - 1), 0, self.imageScrollView.frame.size.width, self.imageScrollView.frame.size.height);
+                                     UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(self.imageScrollView.frame.size.width * (count - 1), 0, self.imageScrollView.frame.size.width, self.imageScrollView.frame.size.height)];
+                                     imageView.contentMode = UIViewContentModeCenter;
+                                     imageView.image = image;
+                                     imageView.clipsToBounds = YES;
                                      
                                      [self.imageScrollView addSubview:imageView];
                                      
@@ -215,14 +227,17 @@
                                      const std::vector<cv::Rect> faces = [self.faceDetector facesFromImage:cvimage];
                                      
                                      if ([self learnFace:faces forImage:cvimage]) {
-
+                                         
+                                         numberOfFaces++;
+                                         
                                          self.numPicsTaken++;
                                          
-                                         self.instructionsLabel.text = [NSString stringWithFormat:@"Processed %d of %d", self.numPicsTaken, [info count]];
+                                         self.instructionsLabel.text = [NSString stringWithFormat:@"Found %d faces", numberOfFaces];
                                      }
                                      
                                      count++;
                                  }
+
                              }];
 }
 
