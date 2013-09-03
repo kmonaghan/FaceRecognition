@@ -148,6 +148,24 @@
     sqlite3_finalize(statement);
 }
 
+- (NSInteger)numberOfFacesForPersonID:(int)personID
+{
+    const char* selectSQL = "SELECT COUNT(*) FROM images WHERE person_id = ?";
+    sqlite3_stmt *statement;
+    
+    NSInteger count = 0;
+    if (sqlite3_prepare_v2(_db, selectSQL, -1, &statement, nil) == SQLITE_OK) {
+        sqlite3_bind_int(statement, 1, personID);
+        if (sqlite3_step(statement)== SQLITE_ROW) {
+            count = sqlite3_column_int(statement, 0);
+        }
+    }
+    
+    sqlite3_finalize(statement);
+    
+    return count;
+}
+
 - (void)learnFace:(cv::Rect)face ofPersonID:(int)personID fromImage:(cv::Mat&)image
 {
     cv::Mat faceData = [self pullStandardizedFace:face fromImage:image];
