@@ -47,7 +47,7 @@
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:CellIdentifier forIndexPath:indexPath];
     
     NSDictionary *person = [self.people objectAtIndex:row];
-    cell.textLabel.text = [person objectForKey:@"name"];
+    cell.textLabel.text = [NSString stringWithFormat:@"%@ (%d)", person[@"name"], [self.faceRecognizer numberOfFacesForPersonID:[person[@"id"] integerValue]]];
     
     return cell;
 }
