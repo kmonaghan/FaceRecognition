@@ -9,6 +9,7 @@
 #import <AssertMacros.h>
 
 #import "OpenCVData.h"
+#import "opencv2/highgui/ios.h"
 
 #import "CustomFaceRecognizer.h"
 
@@ -324,7 +325,6 @@ bail:
     }
     
 	NSArray *sublayers = [NSArray arrayWithArray:[previewLayer sublayers]];
-	NSInteger sublayersCount = [sublayers count], currentSublayer = 0;
 	NSInteger featuresCount = [features count], currentFeature = 0;
 	
 	[CATransaction begin];
@@ -402,7 +402,8 @@ bail:
         if (!processing[[NSNumber numberWithInt:feature.trackingID]]) {
             processing[[NSNumber numberWithInt:feature.trackingID]] = @"1";
             
-            cv::Mat cvImage = [OpenCVData cvMatFromUIImage:image usingColorSpace:CV_RGBA2BGRA];
+            cv::Mat cvImage;
+            UIImageToMat(image, cvImage, NO);
             
             [self parseFace:[OpenCVData CGRectToFace:feature.bounds]
                    forImage:cvImage

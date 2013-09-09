@@ -8,6 +8,7 @@
 
 #import "CaptureImagesViewController.h"
 #import "OpenCVData.h"
+#import "opencv2/highgui/ios.h"
 #import "ELCImagePickerController.h"
 #import "ELCAlbumPickerController.h"
 
@@ -222,11 +223,12 @@
                                      
                                      self.imageScrollView.contentOffset = CGPointMake(self.imageScrollView.frame.size.width * (count - 1), 0);
                                      
-                                     cv::Mat cvimage = [OpenCVData cvMatFromUIImage:image usingColorSpace:CV_RGBA2BGRA];
+                                     cv::Mat cvImage;
+                                     UIImageToMat(image, cvImage, NO);
                                      
-                                     const std::vector<cv::Rect> faces = [self.faceDetector facesFromImage:cvimage];
+                                     const std::vector<cv::Rect> faces = [self.faceDetector facesFromImage:cvImage];
                                      
-                                     if ([self learnFace:faces forImage:cvimage]) {
+                                     if ([self learnFace:faces forImage:cvImage]) {
                                          
                                          numberOfFaces++;
                                          
