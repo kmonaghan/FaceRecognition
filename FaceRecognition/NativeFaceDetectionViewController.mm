@@ -32,7 +32,6 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
     CIDetector *faceDetector;
     
     BOOL isUsingFrontFacingCamera;
-    BOOL isMirrored;
     
     NSMutableDictionary *recognisedFaces;
     NSMutableDictionary *processing;
@@ -96,7 +95,7 @@ static CGFloat DegreesToRadians(CGFloat degrees) {return degrees * M_PI / 180;};
     if (self) {
         // Custom initialization
         
-
+        
     }
     return self;
 }
@@ -229,7 +228,7 @@ bail:
         }
     }
     
-       
+    
 }
 
 // clean up capture setup
@@ -242,11 +241,7 @@ bail:
 
 #pragma mark -
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection
-{
-
-    
-    isMirrored = [connection isVideoMirrored];
-    
+{    
 	// got an image
 	CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
 	CFDictionaryRef attachments = CMCopyDictionaryOfAttachments(kCFAllocatorDefault, sampleBuffer, kCMAttachmentMode_ShouldPropagate);
@@ -354,81 +349,44 @@ bail:
                                                                         apertureSize:clap.size];
 	
 	for ( CIFaceFeature *ff in features ) {
+        NSLog(@"ff bounds: %@", NSStringFromCGRect(ff.bounds));
+        NSLog(@"ff leftEyePosition: %@", NSStringFromCGPoint(ff.leftEyePosition));
+        NSLog(@"ff rightEyePosition: %@", NSStringFromCGPoint(ff.rightEyePosition));
+        NSLog(@"ff mouthPosition: %@", NSStringFromCGPoint(ff.mouthPosition));
+        NSLog(@"ff tracking ID: %d", ff.trackingID );
+        
 		// find the correct position for the square layer within the previewLayer
 		// the feature box originates in the bottom left of the video frame.
 		// (Bottom right if mirroring is turned on)
         
-		CGRect faceRect = [ff bounds];
+        CGRect faceRect = ff.bounds;
         
-		// flip preview width and height
-		CGFloat temp = faceRect.size.width;
-		faceRect.size.width = faceRect.size.height;
-		faceRect.size.height = temp;
-		temp = faceRect.origin.x;
-		faceRect.origin.x = faceRect.origin.y;
-		faceRect.origin.y = temp;
-		// scale coordinates so they fit in the preview box, which may be scaled
-		CGFloat widthScaleBy = previewBox.size.width / clap.size.height;
-		CGFloat heightScaleBy = previewBox.size.height / clap.size.width;
-		faceRect.size.width *= widthScaleBy;
-		faceRect.size.height *= heightScaleBy;
-		faceRect.origin.x *= widthScaleBy;
-		faceRect.origin.y *= heightScaleBy;
+        // flip preview width and height
+        CGFloat temp = faceRect.size.width;
+        faceRect.size.width = faceRect.size.height;
+        faceRect.size.height = temp;
+        temp = faceRect.origin.x;
+        faceRect.origin.x = faceRect.origin.y;
+        faceRect.origin.y = temp;
+        // scale coordinates so they fit in the preview box, which may be scaled
+        CGFloat widthScaleBy = previewBox.size.width / clap.size.height;
+        CGFloat heightScaleBy = previewBox.size.height / clap.size.width;
+        faceRect.size.width *= widthScaleBy;
+        faceRect.size.height *= heightScaleBy;
+        faceRect.origin.x *= widthScaleBy;
+        faceRect.origin.y *= heightScaleBy;
         
-		if ( isMirrored )
-			faceRect = CGRectOffset(faceRect, previewBox.origin.x + previewBox.size.width - faceRect.size.width - (faceRect.origin.x * 2), previewBox.origin.y);
-		else
-			faceRect = CGRectOffset(faceRect, previewBox.origin.x, previewBox.origin.y);
-		/*
-		CALayer *featureLayer = nil;
-		
-		// re-use an existing layer if possible
-		while ( !featureLayer && (currentSublayer < sublayersCount) ) {
-			CALayer *currentLayer = [sublayers objectAtIndex:currentSublayer++];
-			if ( [[currentLayer name] isEqualToString:@"FaceLayer"] ) {
-				featureLayer = currentLayer;
-				[currentLayer setHidden:NO];
-			}
-		}
-		
-		// create a new one if necessary
-		if ( !featureLayer ) {
-			featureLayer = [CALayer new];
-			[featureLayer setContents:(id)[square CGImage]];
-			[featureLayer setName:@"FaceLayer"];
-			[previewLayer addSublayer:featureLayer];
-		}
-		[featureLayer setFrame:faceRect];
-		
-		switch (orientation) {
-			case UIDeviceOrientationPortrait:
-				[featureLayer setAffineTransform:CGAffineTransformMakeRotation(DegreesToRadians(0.))];
-				break;
-			case UIDeviceOrientationPortraitUpsideDown:
-				[featureLayer setAffineTransform:CGAffineTransformMakeRotation(DegreesToRadians(180.))];
-				break;
-			case UIDeviceOrientationLandscapeLeft:
-				[featureLayer setAffineTransform:CGAffineTransformMakeRotation(DegreesToRadians(90.))];
-				break;
-			case UIDeviceOrientationLandscapeRight:
-				[featureLayer setAffineTransform:CGAffineTransformMakeRotation(DegreesToRadians(-90.))];
-				break;
-			case UIDeviceOrientationFaceUp:
-			case UIDeviceOrientationFaceDown:
-			default:
-				break; // leave the layer in its last known orientation
-		}
-         */
+        if ( isUsingFrontFacingCamera )
+            faceRect = CGRectOffset(faceRect, previewBox.origin.x + previewBox.size.width - faceRect.size.width - (faceRect.origin.x * 2), previewBox.origin.y);
+        else
+            faceRect = CGRectOffset(faceRect, previewBox.origin.x, previewBox.origin.y);
         
         NSString *name = recognisedFaces[[NSNumber numberWithInt:ff.trackingID]];
         
         if (([features count] > 1) && (ff.trackingID == 0)) {
             name = nil;
         }
-        
-        if (name) {
-            NSLog(@"%@ is %d", name, ff.trackingID);
-        }
+
         [self showFaceRect:faceRect withName:name];
         
 		currentFeature++;
@@ -513,7 +471,7 @@ bail:
     return (image);
 }
 
-- (void)showFaceRect:(CGRect)rect withName:(NSString *)name 
+- (void)showFaceRect:(CGRect)rect withName:(NSString *)name
 {
     UIView *view = [[UIView alloc] initWithFrame:rect];
     
